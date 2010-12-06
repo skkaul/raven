@@ -67,14 +67,79 @@ using namespace std;
 namespace {
 
     RoboteqDevice device;
+    ros::Time current_time, last_time;
+    double posx = 0.0;
+    double posy = 0.0;
+    double posth = 0.0;
 };
 
 
 void publish_pose(tf::TransformBroadcaster *odom_broadcaster, ros::Publisher *odom_pub)
 {
-  ROS_INFO("Timer trigerred at 10Hz");
-  nav_msgs::Odometry odom_pose;
-  odom_pub->publish(odom_pose);
+
+  double vx, vy, vth;
+  double delta_x, delta_y, delta_th;
+
+  //get encoder data from the roboteq 
+  int left_enc_data, right_enc_data;
+  float wheel_circumference = WHEEL_DIAMETER * M_PI;
+  float left_enc = left_enc_data * wheel_circumference/ENCODER_RESOLUTION;
+  float right_enc = right_enc_data * wheel_circumference/ENCODER_RESOLUTION;
+  float diff_enc = (right_enc - left_enc)/WHEEL_BASE_WIDTH;
+  
+  float dist = (left_enc + right_enc)/2.0;
+  delta_th = (double) diff_enc;
+  delta_x = cos(posth) * dist; //check
+  delta_y = -sin(posth) * dist; //check
+
+  current_time = ros::Time::now();
+
+  //compute odometry in a typical way given the velocities of the robot
+  double dt = (current_time - last_time).toSec();
+  vx = delta_x/dt;
+  vy = delta_y/dt;
+  vth = delta_th/dt;
+
+  posx += delta_x;
+  posy += delta_y;
+  posth += delta_th;
+   
+  //since all odometry is 6DOF we'll need a quaternion created from yaw
+  geometry_msgs::Quaternion odom_quat = tf::createQuaternionMsgFromYaw(posth);
+
+  //first, we'll publish the transform over tf
+  geometry_msgs::TransformStamped odom_trans;
+  odom_trans.header.stamp = current_time;
+  odom_trans.header.frame_id = "odom";
+  odom_trans.child_frame_id = "base_link";
+
+  odom_trans.transform.translation.x = posx;
+  odom_trans.transform.translation.y = posy;
+  odom_trans.transform.translation.z = 0.0;
+  odom_trans.transform.rotation = odom_quat;
+
+  //send the transform
+  odom_broadcaster->sendTransform(odom_trans);
+
+  //next, we'll publish the odometry message over ROS
+  nav_msgs::Odometry odom;
+  odom.header.stamp = current_time;
+  odom.header.frame_id = "odom";
+
+  //set the position
+  odom.pose.pose.position.x = posx;
+  odom.pose.pose.position.y = posy;
+  odom.pose.pose.position.z = 0.0;
+  odom.pose.pose.orientation = odom_quat;
+
+  //set the velocity
+  odom.child_frame_id = "base_link";
+  odom.twist.twist.linear.x = vx;
+  odom.twist.twist.linear.y = vy;
+  odom.twist.twist.angular.z = vth;
+  
+  odom_pub->publish(odom);
+  last_time = current_time;
 }
 
 void cmdvelcallback(const geometry_msgs::Twist::ConstPtr& cmd_vel)
@@ -168,10 +233,12 @@ int main( int argc, char **argv )
     std::string frame_id;
     n.param<std::string>("port", portname, "/dev/ttyUSB0");
     n.param("baudrate", baudrate, 115200);
-    n.param<std::string>("frame_id", frame_id, "/base_frame");
+    n.param<std::string>("frame_id", frame_id, "/base_link");
    
      
     int status = device.Connect(portname);
+    current_time = ros::Time::now();
+    last_time = ros::Time::now();
 
     if(status != RQ_SUCCESS){
       cout << "Error connecting to the device: "<< status <<"."<< endl;

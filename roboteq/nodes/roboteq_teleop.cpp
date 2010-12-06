@@ -40,6 +40,14 @@
 #include <geometry_msgs/Twist.h>
 #include <joy/Joy.h>
 
+namespace {
+
+  int linear_, angular_;
+  double l_scale_, a_scale_;
+  ros::Publisher vel_pub;
+  ros::Subscriber joy_sub;
+};
+
 void joycallback(const joy::Joy::ConstPtr& joy)
 {
   geometry_msgs::Twist cmd_vel;
@@ -56,8 +64,6 @@ int main(int argc, char** argv)
   // no delay: we always want the most recent data
   ros::TransportHints noDelay = ros::TransportHints().tcpNoDelay(true);
 
-  int linear_, angular_;
-  double l_scale_, a_scale_;
   
   ros::NodeHandle n;
   n.param("axis_linear", linear_, linear_);
@@ -65,8 +71,8 @@ int main(int argc, char** argv)
   n.param("scale_angular", a_scale_, a_scale_);
   n.param("scale_linear", l_scale_, l_scale_);
  
-  ros::Publisher vel_pub = n.advertise<geometry_msgs::Twist>("cmd_vel", 1);
-  ros::Subscriber joy_sub = n.subscribe<joy::Joy>("joy",1,joycallback,noDelay);
+  vel_pub = n.advertise<geometry_msgs::Twist>("cmd_vel", 1);
+  joy_sub = n.subscribe<joy::Joy>("joy",1,joycallback,noDelay);
   
 
   ros::spin();

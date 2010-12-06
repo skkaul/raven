@@ -231,9 +231,8 @@ int main( int argc, char **argv )
     std::string portname;
     int baudrate;
     std::string frame_id;
-    n.param<std::string>("port", portname, "/dev/ttyUSB0");
-    n.param("baudrate", baudrate, 115200);
-    n.param<std::string>("frame_id", frame_id, "/base_link");
+    n.param<std::string>("port", portname, portname);
+    n.param("baudrate", baudrate, baudrate);
    
      
     int status = device.Connect(portname);

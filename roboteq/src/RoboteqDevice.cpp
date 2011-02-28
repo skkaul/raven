@@ -86,7 +86,8 @@ void RoboteqDevice::InitPort()
 		return;
 
 	//Get the existing Comm Port Attributes in cwrget
-	int BAUDRATE = B9600;
+	//int BAUDRATE = B9600;
+	int BAUDRATE = B115200;
 	struct termios newtio;
 	tcgetattr (handle, &newtio);
 
@@ -95,22 +96,14 @@ void RoboteqDevice::InitPort()
 	cfsetispeed (&newtio, (speed_t)BAUDRATE);
 
 	//Enable the Receiver and  Set local Mode
-	newtio.c_iflag = IGNBRK;		/* Ignore Break Condition & no processing under input options*/
+	newtio.c_iflag = IGNBRK | IGNPAR;		/* Ignore Break Condition & no processing under input options*/
 	newtio.c_lflag = 0;			/* Select the RAW Input Mode through Local options*/
 	newtio.c_oflag = 0;			/* Select the RAW Output Mode through Local options*/
-	newtio.c_cflag |= (CLOCAL | CREAD);	/* Select the Local Mode & Enable Receiver through Control options*/
+	newtio.c_cflag |= (CLOCAL | CREAD | CS8);	/* Select the Local Mode & Enable Receiver through Control options*/
 
-	//Set Data format to 7E1
-	newtio.c_cflag &= ~CSIZE;		/* Mask the Character Size Bits through Control options*/
-	newtio.c_cflag |= CS7;			/* Select Character Size to 7-Bits through Control options*/
-	newtio.c_cflag |= PARENB;		/* Select the Parity Enable through Control options*/
-	newtio.c_cflag &= ~PARODD;		/* Select the Even Parity through Control options*/
-
-	//cwrset.c_iflag |= (INPCK|ISTRIP);
-	//cwrset.c_cc[VMIN] = 6;
 
 	//Set the New Comm Port Attributes through cwrset
-	tcsetattr (fd0, TCSANOW, &newtio);	/* Set the attribute NOW without waiting for Data to Complete*/
+	tcsetattr (handle, TCSANOW, &newtio);	/* Set the attribute NOW without waiting for Data to Complete*/
 }
 
 int RoboteqDevice::Write(string str)
@@ -124,6 +117,7 @@ int RoboteqDevice::Write(string str)
 	//Verify weather the Transmitting Data on UART was Successful or Not
 	if(countSent < 0)
 		return RQ_ERR_TRANSMIT_FAILED;
+	//fprintf(stderr, "sent %d bytes\n", countSent);
 
 	return RQ_SUCCESS;
 }
@@ -136,7 +130,7 @@ int RoboteqDevice::ReadAll(string &str)
 	char buf[BUFFER_SIZE + 1] = "";
 
 	str = "";
-	int i = 0;
+	//int i = 0;
 	while((countRcv = read(handle, buf, BUFFER_SIZE)) > 0)
 	{
 		str.append(buf, countRcv);
@@ -168,12 +162,17 @@ int RoboteqDevice::IssueCommand(string commandType, string command, string args,
 	else
 		status = Write(commandType + command + " " + args + "\r");
 
-	if(status != RQ_SUCCESS)
+	if(status != RQ_SUCCESS){
+		//fprintf(stderr, "write status %d\n", status);
 		return status;
+	}
 
 	usleep(waitms * 1000l);
 
 	status = ReadAll(read);
+	//fprintf(stderr, "read status %d\n", status);
+	//fprintf(stderr, "reading %s\n", read.c_str());
+	
 	if(status != RQ_SUCCESS)
 		return status;
 
@@ -188,8 +187,10 @@ int RoboteqDevice::IssueCommand(string commandType, string command, string args,
 
 
 	string::size_type pos = read.rfind(command + "=");
+	//fprintf(stderr, "final status %d %d %d\n", status, pos, string::npos);
 	if(pos == string::npos)
 		return RQ_INVALID_RESPONSE;
+	//fprintf(stderr, "final2 status %d\n", status);
 
 	pos += command.length() + 1;
 

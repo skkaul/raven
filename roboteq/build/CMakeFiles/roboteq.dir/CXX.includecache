@@ -1,0 +1,34 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+../include/roboteq/ErrorCodes.h
+
+../include/roboteq/RoboteqDevice.h
+
+/home/avinash/ros/raven-read-only/roboteq/src/RoboteqDevice.cpp
+iostream
+-
+stdio.h
+-
+string.h
+-
+fcntl.h
+-
+errno.h
+-
+termios.h
+-
+time.h
+-
+sstream
+-
+roboteq/RoboteqDevice.h
+/home/avinash/ros/raven-read-only/roboteq/src/roboteq/RoboteqDevice.h
+roboteq/ErrorCodes.h
+/home/avinash/ros/raven-read-only/roboteq/src/roboteq/ErrorCodes.h
+

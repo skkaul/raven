@@ -18,7 +18,7 @@
 *   * Neither the name of the ISR University of Coimbra nor the names of its
 *     contributors may be used to endorse or promote products derived
 *     from this software without specific prior written permission.
-*
+F*
 *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -65,12 +65,17 @@ using namespace std;
 
 //globals
 namespace {
-
+  //  roboteq_node r;
     RoboteqDevice device;
     ros::Time current_time, last_time;
     double posx = 0.0;
     double posy = 0.0;
     double posth = 0.0;
+  int previous_cmdl=0;
+  int previous_cmdr=0;
+  int present_l,present_r;
+  int previous_l=0;
+int previous_r=0;
 };
 
 
@@ -79,21 +84,33 @@ void publish_pose(tf::TransformBroadcaster *odom_broadcaster, ros::Publisher *od
 
   double vx, vy, vth;
   double delta_x, delta_y, delta_th;
-
-  //get encoder data from the roboteq 
+ 
   int left_enc_data, right_enc_data;
+   if(device.GetValue(_C, 1, left_enc_data)!=RQ_SUCCESS)
+   ROS_INFO("Encoder data decoding failed");  
+  if(device.GetValue(_C, 2, right_enc_data)!=RQ_SUCCESS)
+    ROS_INFO("Encoder data decoding failed");
+  ROS_INFO("left_%d Right_%d",left_enc_data,right_enc_data);
+  present_l=left_enc_data-previous_l;
+  present_r=right_enc_data-previous_r;
+  previous_l=left_enc_data;
+  previous_r=right_enc_data;
+    
+  /*  if(left_enc_data==right_enc_data)
+    ROS_INFO("ENCODER COUNT EQUL");
+  else
+    ROS_INFO("Encoder data decoding failed");*/
   float wheel_circumference = WHEEL_DIAMETER * M_PI;
-  float left_enc = left_enc_data * wheel_circumference/ENCODER_RESOLUTION;
-  float right_enc = right_enc_data * wheel_circumference/ENCODER_RESOLUTION;
+  float left_enc = present_l * wheel_circumference/ENCODER_RESOLUTION;
+  float right_enc = present_r * wheel_circumference/ENCODER_RESOLUTION;
   float diff_enc = (right_enc - left_enc)/WHEEL_BASE_WIDTH;
   
   float dist = (left_enc + right_enc)/2.0;
   delta_th = (double) diff_enc;
   delta_x = cos(posth) * dist; //check
-  delta_y = -sin(posth) * dist; //check
+  delta_y = sin(posth) * dist; //check
 
   current_time = ros::Time::now();
-
   //compute odometry in a typical way given the velocities of the robot
   double dt = (current_time - last_time).toSec();
   vx = delta_x/dt;
@@ -141,7 +158,23 @@ void publish_pose(tf::TransformBroadcaster *odom_broadcaster, ros::Publisher *od
   odom_pub->publish(odom);
   last_time = current_time;
 }
+/*void sendcommand(int x, int y)
+{
+  int status;
+ 
+if 
+do
+    {
+    
+ if((status = device.SetCommand(_GO, 1, x)) != RQ_SUCCESS)
+ cout<<"failed --> "<<status<<endl;
 
+  if((status = device.SetCommand(_GO, 2, y)) != RQ_SUCCESS)
+      cout<<"failed --> "<<status<<endl;
+ previous_x=x;
+    }while(previous_cmdr
+}
+*/
 void cmdvelcallback(const geometry_msgs::Twist::ConstPtr& cmd_vel)
 {
   float v_mag, mag_r;
@@ -203,20 +236,31 @@ void cmdvelcallback(const geometry_msgs::Twist::ConstPtr& cmd_vel)
     speed_right = v_right/MAX_WHEEL_VELOCITY;
   }
 
+
   left_cmd  = int(speed_left * MOTOR_RANGE);
   right_cmd = int(speed_right * MOTOR_RANGE);
+  ROS_INFO("LEFTCMD_%d rightCMD_%d",left_cmd,right_cmd);
 
   //send these to the roboteq controller
-  // TO DO
+    // TO DO
+ 
   int status;
-  ROS_INFO("- SetCommand(_GO, 1, 1)...");
-  if((status = device.SetCommand(_GO, 1, left_cmd)) != RQ_SUCCESS)
-    cout<<"failed --> "<<status<<endl;
+  ROS_INFO("- SetCommand(_M, Left_cmd, Right_cmd)...");
+  //  if((status = device.SetCommand(_M,left_cmd,right_cmd)) != RQ_SUCCESS)
+  // cout<<"failed --> "<<status<<endl;
   //sleep for 10 ms do we have to do this 
-  ros::Duration(0.01).sleep(); //sleep for 10 ms 
+  //ros::Duration(0.01).sleep(); //sleep for 10 ms
+  //roboteq_node r;
+  //sendcommand(left_cmd,right_cmd);
+  do
+    {
+ if((status = device.SetCommand(_GO, 1, left_cmd)) != RQ_SUCCESS)
+ cout<<"failed --> "<<status<<endl;
   if((status = device.SetCommand(_GO, 2, right_cmd)) != RQ_SUCCESS)
-    cout<<"failed --> "<<status<<endl;
-
+      cout<<"failed --> "<<status<<endl;
+    }while(((previous_cmdl!=0)&(left_cmd!=0))|((previous_cmdr!=0)&(right_cmd!=0)));
+ previous_cmdl=left_cmd;
+ previous_cmdr=right_cmd;
 }
 
 int main( int argc, char **argv )
@@ -226,43 +270,42 @@ int main( int argc, char **argv )
     tf::TransformBroadcaster odom_broadcaster;
     // no delay: we always want the most recent data
     ros::TransportHints noDelay = ros::TransportHints().tcpNoDelay(true);
-	
+    
     //Params
-    std::string portname;
-    int baudrate;
+    std::string portname = "/dev/ttyUSB0";//changed runtime
+    int baudrate = 115200;
     std::string frame_id;
     n.param<std::string>("port", portname, portname);
     n.param("baudrate", baudrate, baudrate);
-   
-     
+    
     int status = device.Connect(portname);
     current_time = ros::Time::now();
     last_time = ros::Time::now();
-
-    if(status != RQ_SUCCESS){
-      cout << "Error connecting to the device: "<< status <<"."<< endl;
-      return -1;
-    }
+    
+     if(status != RQ_SUCCESS)
+       {
+    cout << "Error connecting to the device: "<< status <<"."<< endl;
+    return -1;
+        }
     ROS_INFO("Roboteq -- Successfully connected to the Roboteq HDC2450");
     ros::Duration(0.01).sleep(); //sleep for 10 ms 
     
-    	
-    ROS_INFO("- SetConfig(_DINA, 1, 1)...");
-    if((status = device.SetConfig(_DINA, 1, 1)) != RQ_SUCCESS)
-      cout<<"failed --> "<<status<<endl;
+    	ROS_INFO("- SetConfig(_DINA, 1, 1)...");
+   if((status = device.SetConfig(_DINA, 1, 1)) != RQ_SUCCESS)
+    cout<<"failed --> "<<status<<endl;
     else
       ROS_INFO("succeeded.");
     ros::Duration(0.01).sleep(); //sleep for 10 ms 
 
     int result;
-    ROS_INFO("- GetConfig(_DINA, 1)...");
-    if((status = device.GetConfig(_DINA, 1, result)) != RQ_SUCCESS)
-      cout<<"failed --> "<<status<<endl;
+  ROS_INFO("- GetConfig(_DINA, 1)...");
+  if((status = device.GetConfig(_DINA, 1, result)) != RQ_SUCCESS)
+  cout<<"failed --> "<<status<<endl;
     else
       cout<<"returned --> "<<result<<endl;
     ROS_INFO("Roboteq -- Successfull setup of the Roboteq HDC2450");
     ros::Duration(0.01).sleep(); //sleep for 10 ms 
-
+   
     //subscribe to the motor_control topic to listen to motor commands
     ros::Subscriber roboteq_sub = n.subscribe<geometry_msgs::Twist>("cmd_vel", 1, cmdvelcallback, noDelay);
 
@@ -280,7 +323,7 @@ int main( int argc, char **argv )
     }
 
     ROS_INFO("Roboteq: exiting main loop");
-    device.Disconnect();
+     device.Disconnect();
     return 0;
 }
 

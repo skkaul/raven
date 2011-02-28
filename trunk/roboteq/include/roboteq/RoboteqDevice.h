@@ -10,7 +10,7 @@ class RoboteqDevice
 {
 private:
 	int device_fd;
-	int fd0;
+	//int fd0;
 	int handle;
 
 protected:

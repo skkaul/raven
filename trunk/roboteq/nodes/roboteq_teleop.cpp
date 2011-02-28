@@ -39,10 +39,10 @@
 #include <ros/ros.h>
 #include <geometry_msgs/Twist.h>
 #include <joy/Joy.h>
-
+using namespace std;
 namespace {
 
-  int linear_, angular_;
+  int linear_,linear1_, angular_,angular1_;
   double l_scale_, a_scale_;
   ros::Publisher vel_pub;
   ros::Subscriber joy_sub;
@@ -50,10 +50,30 @@ namespace {
 
 void joycallback(const joy::Joy::ConstPtr& joy)
 {
+ 
+  ROS_INFO("cmd vel published");
   geometry_msgs::Twist cmd_vel;
-  cmd_vel.angular.z = a_scale_*joy->axes[angular_];
-  cmd_vel.linear.x = l_scale_*joy->axes[linear_];
-  vel_pub.publish(cmd_vel);
+  cmd_vel.angular.z=0;
+    cmd_vel.linear.x=0;
+   do 
+  { 
+    if(joy->buttons[0])
+      {cmd_vel.angular.z = a_scale_*joy->buttons[angular_];break;}//changed
+else
+  if(joy->buttons[2])
+    {cmd_vel.angular.z=-(a_scale_)*joy->buttons[angular1_];break;}
+  else
+    if(joy->buttons[3])
+      {cmd_vel.linear.x = l_scale_*joy->buttons[linear_];break;}//changed
+    else
+      if( joy->buttons[1] ) 
+ {
+ cmd_vel.linear.x=-(l_scale_)*joy->buttons[linear1_];break;
+      }
+else
+    vel_pub.publish(cmd_vel);
+     }while((joy->buttons[0]==1)|(joy->buttons[1]==1)|(joy->buttons[2]==1)|(joy->buttons[3]==1));     
+    vel_pub.publish(cmd_vel);   
 }
 
 
@@ -63,18 +83,27 @@ int main(int argc, char** argv)
   ros::init(argc, argv, "roboteq_teleop");
   // no delay: we always want the most recent data
   ros::TransportHints noDelay = ros::TransportHints().tcpNoDelay(true);
+  int def=3;
+  int def0=1;
+  int def1=0;
+  int def2=2;
+  double def5=1.2;
 
+  //  double f1=4.8;//changing for debugging
+  // int def2=0;
   
   ros::NodeHandle n;
-  n.param("axis_linear", linear_, linear_);
-  n.param("axis_angular", angular_, angular_);
-  n.param("scale_angular", a_scale_, a_scale_);
-  n.param("scale_linear", l_scale_, l_scale_);
- 
+  n.param("axis_linear", linear_, def );
+  n.param("axis_linear",linear1_,def0);
+  n.param("axis_angular", angular_, def1);
+  n.param("axis_angular",angular1_,def2);
+  n.param("scale_angular", a_scale_, def5);
+  n.param("scale_linear", l_scale_, def5);
+
   vel_pub = n.advertise<geometry_msgs::Twist>("cmd_vel", 1);
   joy_sub = n.subscribe<joy::Joy>("joy",1,joycallback,noDelay);
   
-
+  //ros::Rate r(20);
   ros::spin();
   return 0;
 }

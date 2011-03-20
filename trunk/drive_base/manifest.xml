@@ -1,0 +1,17 @@
+<package>
+  <description brief="drive_base">
+
+     drive_base
+
+  </description>
+  <author>Srikanth Saripalli</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/drive_base</url>
+  <depend package="roscpp"/>
+  <depend package="geometry_msgs"/>
+	<depend package="tf"/>
+<depend package="gpsd_viewer"/>
+</package>
+
+

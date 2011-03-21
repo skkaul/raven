@@ -27,9 +27,12 @@
 #define pi 3.14
 namespace{
 ros::Publisher pub_cmd;
-
+gpsd_viewer::cmd c;
 double lastlat,lastlon;
 int k=0;
+int i=0;
+int m=0;
+double temp1[6];
 }
 /*:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::*/
 /*::  This function converts decimal degrees to radians             :*/
@@ -49,9 +52,10 @@ double rad2deg(double rad)
 
 double distance(double lat1, double lon1)
 {
-gpsd_viewer::cmd c;
+
   double theta, dist;
 fprintf(stderr, "lastlat %f lastlon %f\n", lastlat, lastlon);
+
 
   theta = lon1 - lastlon;
   dist = sin(deg2rad(lat1)) * sin(deg2rad(lastlat)) + cos(deg2rad(lat1)) * cos(deg2rad(lastlat)) * cos(deg2rad(theta));
@@ -60,20 +64,41 @@ fprintf(stderr, "lastlat %f lastlon %f\n", lastlat, lastlon);
   dist = dist * 60 * 1.1515;
   dist = dist * (1.609344);
 dist=dist*1000;
-c.distance=dist;
+c.distance[i]=dist;
 double dLon = deg2rad(theta);
 double y = sin(dLon) * cos(lat1);
 double x = cos(lastlat)*sin(lat1) -
         sin(lastlat)*cos(lat1)*cos(dLon);
-double brng =rad2deg(atan2(y,x));
-c.angle=brng;
+double brng =atan2(y,x);
+c.angle[i]=brng;
 fprintf(stderr,"brng %f\n",brng);
 lastlat =lat1;
 lastlon=lon1;
 c.header.frame_id="cmd";
 c.header.stamp = ros::Time::now();
- pub_cmd.publish(c);
+c.num_of_waypoints=i+1;
+//c.distance[]={0,0,0,0,0};
+//c.angle[]={0,0,0,0,0};
+//temp1[i]=dist;
+//m++;
+//if(m==5)
+//{
+//for(i=0;i=5;i++)
+//c.distance[i]=temp1[i];
+//}
+if(i==5)
 
+{
+pub_cmd.publish(c);
+}
+i++;
+for(int j=0;j<=5;j++)
+{
+
+fprintf(stderr,"temp %f\n",c.distance[j]);
+
+}
+fprintf(stderr,"m %d\n",m);
   return (dist);
 }
 
@@ -107,6 +132,7 @@ else
 {
 dist=distance(lat1,lon1);
 fprintf(stderr, "distance betwwn two points %f", dist);
+//i=i+1;
 }
         if (event->button == 1) {
             osm_gps_map_gps_add (map,lat,lon,g_random_double_range(0,360));
@@ -191,7 +217,6 @@ void *startROS (void *user)
 	 ros::Subscriber fix_sub;
     fix_sub = n.subscribe ("/fix", 1, &gpsFixCallback);
     pub_cmd= n.advertise<gpsd_viewer::cmd>("cmd",5);
-    
     ROS_INFO ("Spinning");
     ros::spin ();
   }
